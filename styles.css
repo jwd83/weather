@@ -32,18 +32,12 @@ header {
     gap: 12px;
 }
 
-header h1 {
-    font-size: 2rem;
-    margin: 0;
-    letter-spacing: -0.02em;
-}
-
 .header-top {
     width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 14px;
+    gap: 12px;
     flex-wrap: wrap;
 }
 
@@ -55,34 +49,35 @@ header h1 {
 }
 
 .unit-toggle {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 0;
-    justify-content: center;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.28);
 }
 
 .unit-btn {
-    padding: 6px 12px;
-    background: rgba(255, 255, 255, 0.2);
-    color: #fff;
-    border: 2px solid rgba(255, 255, 255, 0.35);
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.9);
+    padding: 8px 14px;
     border-radius: 999px;
-    font-size: 0.95rem;
     cursor: pointer;
-    font-weight: bold;
+    font-weight: 800;
+    font-size: 0.95rem;
     transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
 }
 
 .unit-btn:hover {
     transform: translateY(-1px);
-    background: rgba(255, 255, 255, 0.28);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .unit-btn.active {
     background: #fff;
     color: #667eea;
-    border-color: #fff;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
 
 .tab-bar {

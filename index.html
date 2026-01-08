@@ -11,16 +11,14 @@
     <div class="container">
         <header>
             <div class="header-top">
-                <h1>🌤️ Weather App</h1>
+                <div class="tab-bar" role="tablist" aria-label="Location input mode">
+                    <button type="button" id="tabCity" class="tab-btn active" role="tab" aria-selected="true" aria-controls="panelCity">City</button>
+                    <button type="button" id="tabCoords" class="tab-btn" role="tab" aria-selected="false" aria-controls="panelCoords">Coords</button>
+                </div>
                 <div class="unit-toggle" role="group" aria-label="Temperature units">
                     <button type="button" id="unitToggleF" class="unit-btn" aria-pressed="false">°F</button>
                     <button type="button" id="unitToggleC" class="unit-btn" aria-pressed="false">°C</button>
                 </div>
-            </div>
-
-            <div class="tab-bar" role="tablist" aria-label="Location input mode">
-                <button type="button" id="tabCity" class="tab-btn active" role="tab" aria-selected="true" aria-controls="panelCity">City</button>
-                <button type="button" id="tabCoords" class="tab-btn" role="tab" aria-selected="false" aria-controls="panelCoords">Coords</button>
             </div>
 
             <div class="tab-panels">
