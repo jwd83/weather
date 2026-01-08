@@ -731,3 +731,25 @@ header {
         height: 220px;
     }
 }
+
+/* Footer */
+.site-footer {
+    text-align: center;
+    padding: 20px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border-color);
+}
+
+.site-footer a {
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+
+.site-footer a:hover {
+    text-decoration: underline;
+}
+
+.site-footer p {
+    margin: 4px 0;
+}
