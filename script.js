@@ -66,6 +66,7 @@ const weatherCodeToDescription = {
 let tempChart, precipChart, windChart;
 
 const UNIT_STORAGE_KEY = 'weatherApp.unitPreference';
+const LOCATION_STORAGE_KEY = 'weatherApp.lastLocation';
 const DEFAULT_UNIT = 'c';
 let lastQuery = null;
 
@@ -147,6 +148,26 @@ function setUserUnitPreference(unit) {
     }
 }
 
+function getSavedLocation() {
+    try {
+        const saved = localStorage.getItem(LOCATION_STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+    } catch {
+        // Ignore storage errors
+    }
+    return null;
+}
+
+function saveLocation(lat, lon, locationName, countryCode) {
+    try {
+        localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify({
+            lat, lon, locationName, countryCode
+        }));
+    } catch {
+        // Ignore storage errors
+    }
+}
+
 function getAutoUnitForCountry(countryCode) {
     if (!countryCode) return null;
     return countryCode.toLowerCase() === 'us' ? 'f' : 'c';
@@ -186,6 +207,27 @@ function setUserUnitAndRefresh(unit) {
     });
 }
 
+function formatLocationName(address, displayName) {
+    if (!address) {
+        return typeof displayName === 'string' ? displayName.split(',')[0] : 'Location';
+    }
+
+    const city = address.city || address.town || address.village || address.municipality || address.hamlet;
+    const countryCode = address.country_code ? String(address.country_code).toLowerCase() : null;
+
+    if (countryCode === 'us') {
+        const state = address.state;
+        if (city && state) return `${city}, ${state}`;
+        if (state) return state;
+    }
+
+    const country = address.country;
+    if (city && country) return `${city}, ${country}`;
+    if (city) return city;
+
+    return typeof displayName === 'string' ? displayName.split(',')[0] : 'Location';
+}
+
 async function reverseGeocode(lat, lon) {
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1`;
     const response = await fetch(url);
@@ -193,7 +235,7 @@ async function reverseGeocode(lat, lon) {
 
     const data = await response.json();
     const countryCode = data?.address?.country_code ? String(data.address.country_code).toLowerCase() : null;
-    const displayName = typeof data?.display_name === 'string' ? data.display_name.split(',')[0] : 'Location';
+    const displayName = formatLocationName(data?.address, data?.display_name);
 
     return { countryCode, displayName };
 }
@@ -217,7 +259,7 @@ async function searchByCity() {
             const result = data[0];
             const lat = parseFloat(result.lat);
             const lon = parseFloat(result.lon);
-            const displayName = result.display_name.split(',')[0];
+            const displayName = formatLocationName(result?.address, result?.display_name);
             const countryCode = result?.address?.country_code ? String(result.address.country_code).toLowerCase() : null;
 
             latInput.value = lat;
@@ -265,6 +307,8 @@ async function fetchWeather(lat, lon, locationName = 'Location', options = {}) {
         locationName: resolvedLocationName,
         countryCode
     };
+
+    saveLocation(lat, lon, resolvedLocationName, countryCode);
 
     const temperatureUnitParam = unit === 'f' ? 'fahrenheit' : 'celsius';
     const windSpeedUnitParam = unit === 'f' ? 'mph' : 'kmh';
@@ -499,9 +543,12 @@ function hideError() {
     errorEl.classList.add('hidden');
 }
 
-// Load default location on page load
+// Load saved or default location on page load
 window.addEventListener('load', () => {
-    const defaultLat = 51.5074; // London
-    const defaultLon = -0.1278;
-    fetchWeather(defaultLat, defaultLon, 'London, UK', { countryCode: 'gb' });
+    const saved = getSavedLocation();
+    if (saved && saved.lat != null && saved.lon != null) {
+        fetchWeather(saved.lat, saved.lon, saved.locationName || 'Location', { countryCode: saved.countryCode });
+    } else {
+        fetchWeather(51.5074, -0.1278, 'London, United Kingdom', { countryCode: 'gb' });
+    }
 });
