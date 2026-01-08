@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Weather App</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="favicon.png">
+    <meta property="og:image" content="favicon.png">
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
@@ -97,40 +100,95 @@
                     </div>
                     <div class="radar-container">
                         <div id="radarMap"></div>
+                        <button type="button" id="recenterBtn" class="recenter-btn" aria-label="Recenter map">📍</button>
                     </div>
                 </div>
             </section>
 
 
 
-            <!-- Charts Section -->
-            <section class="charts-section">
-                <div class="chart-container">
-                    <h3>48-Hour Temperature</h3>
-                    <div class="chart-wrapper">
-                        <canvas id="tempChart"></canvas>
-                    </div>
-                </div>
-                <div class="chart-container">
-                    <h3>48-Hour Wind Speed</h3>
-                    <div class="chart-wrapper">
-                        <canvas id="windChart"></canvas>
-                    </div>
-                </div>
-                <div class="chart-container">
-                    <h3>48-Hour Precipitation</h3>
-                    <div class="chart-wrapper">
-                        <canvas id="precipHourlyChart"></canvas>
-                    </div>
-                </div>
-            </section>
-            <!-- 7-Day Forecast -->
+            <!-- 10-Day Forecast -->
             <section class="forecast">
                 <h2>10-Day Forecast</h2>
                 <div id="forecastCards" class="forecast-grid"></div>
             </section>
 
+            <!-- Charts Section -->
+            <section class="charts-section">
+                <div class="chart-tabs" role="tablist" aria-label="48-hour charts">
+                    <button type="button" id="tabTemp" class="chart-tab active" role="tab" aria-selected="true">Temperature</button>
+                    <button type="button" id="tabWind" class="chart-tab" role="tab" aria-selected="false">Wind</button>
+                    <button type="button" id="tabRainChance" class="chart-tab" role="tab" aria-selected="false">Shower Chance</button>
+                    <button type="button" id="tabHumidity" class="chart-tab" role="tab" aria-selected="false">Humidity</button>
+                    <button type="button" id="tabPrecip" class="chart-tab" role="tab" aria-selected="false">Precipitation</button>
+                </div>
+                <div class="chart-container" id="tempChartContainer">
+                    <div class="chart-wrapper">
+                        <canvas id="tempChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container hidden" id="windChartContainer">
+                    <div class="chart-wrapper">
+                        <canvas id="windChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container hidden" id="humidityChartContainer">
+                    <div class="chart-wrapper">
+                        <canvas id="humidityChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container hidden" id="precipChartContainer">
+                    <div class="chart-wrapper">
+                        <canvas id="precipHourlyChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container hidden" id="rainChanceChartContainer">
+                    <div class="chart-wrapper">
+                        <canvas id="rainChanceChart"></canvas>
+                    </div>
+                </div>
+            </section>
 
+            <!-- Detailed Current Conditions -->
+            <section class="details-section">
+                <h2>Current Conditions</h2>
+                <div class="details-table-wrapper">
+                    <table class="details-table" id="detailsTable">
+                        <tbody>
+                            <tr>
+                                <td class="detail-label-cell">Temperature</td>
+                                <td class="detail-value-cell" id="detailTemp">--</td>
+                                <td class="detail-label-cell">Feels Like</td>
+                                <td class="detail-value-cell" id="detailFeelsLike">--</td>
+                            </tr>
+                            <tr>
+                                <td class="detail-label-cell">High</td>
+                                <td class="detail-value-cell" id="detailHigh">--</td>
+                                <td class="detail-label-cell">Low</td>
+                                <td class="detail-value-cell" id="detailLow">--</td>
+                            </tr>
+                            <tr>
+                                <td class="detail-label-cell">Humidity</td>
+                                <td class="detail-value-cell" id="detailHumidity">--</td>
+                                <td class="detail-label-cell">Pressure</td>
+                                <td class="detail-value-cell" id="detailPressure">--</td>
+                            </tr>
+                            <tr>
+                                <td class="detail-label-cell">Wind Speed</td>
+                                <td class="detail-value-cell" id="detailWind">--</td>
+                                <td class="detail-label-cell">Conditions</td>
+                                <td class="detail-value-cell" id="detailConditions">--</td>
+                            </tr>
+                            <tr>
+                                <td class="detail-label-cell">Precipitation</td>
+                                <td class="detail-value-cell" id="detailPrecip">--</td>
+                                <td class="detail-label-cell">Rain Chance</td>
+                                <td class="detail-value-cell" id="detailRainChance">--</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
 
         </main>
     </div>

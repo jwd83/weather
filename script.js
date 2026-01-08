@@ -63,7 +63,7 @@ const weatherCodeToDescription = {
 };
 
 // Chart instances
-let tempChart, precipHourlyChart, windChart;
+let tempChart, precipHourlyChart, windChart, rainChanceChart, humidityChart;
 
 // Radar map instance
 let radarMap = null;
@@ -89,8 +89,9 @@ function animateCurrentHourLine() {
         opacityDirection = -1;
     }
     
-    if (tempChart) tempChart.update('none');
-    if (windChart) windChart.update('none');
+    [tempChart, windChart, precipHourlyChart, rainChanceChart, humidityChart].forEach(chart => {
+        if (chart) chart.update('none');
+    });
     
     animationFrameId = requestAnimationFrame(animateCurrentHourLine);
 }
@@ -108,19 +109,15 @@ function getCurrentHourPosition(times) {
 }
 
 function minuteUpdate(tempTimes) {
-    // Update "Now" line position
+    // Update "Now" line position on all charts
     const newPos = getCurrentHourPosition(tempTimes);
-    if (newPos >= 0 && tempChart && windChart) {
-        const tempAnnotation = tempChart.options.plugins.annotation.annotations.nowLine;
-        const windAnnotation = windChart.options.plugins.annotation.annotations.nowLine;
-        if (tempAnnotation) {
-            tempAnnotation.xMin = newPos;
-            tempAnnotation.xMax = newPos;
-        }
-        if (windAnnotation) {
-            windAnnotation.xMin = newPos;
-            windAnnotation.xMax = newPos;
-        }
+    if (newPos >= 0) {
+        [tempChart, windChart, precipHourlyChart, rainChanceChart, humidityChart].forEach(chart => {
+            if (chart?.options?.plugins?.annotation?.annotations?.nowLine) {
+                chart.options.plugins.annotation.annotations.nowLine.xMin = newPos;
+                chart.options.plugins.annotation.annotations.nowLine.xMax = newPos;
+            }
+        });
     }
     
     // Refresh weather data if stale
@@ -209,6 +206,22 @@ function updateChartsTheme() {
         precipHourlyChart.options.scales.y.grid.color = gridColor;
         precipHourlyChart.options.scales.y.title.color = textColor;
         precipHourlyChart.update('none');
+    }
+    if (rainChanceChart) {
+        rainChanceChart.options.scales.x.ticks.color = textColor;
+        rainChanceChart.options.scales.x.grid.color = gridColor;
+        rainChanceChart.options.scales.y.ticks.color = textColor;
+        rainChanceChart.options.scales.y.grid.color = gridColor;
+        rainChanceChart.options.scales.y.title.color = textColor;
+        rainChanceChart.update('none');
+    }
+    if (humidityChart) {
+        humidityChart.options.scales.x.ticks.color = textColor;
+        humidityChart.options.scales.x.grid.color = gridColor;
+        humidityChart.options.scales.y.ticks.color = textColor;
+        humidityChart.options.scales.y.grid.color = gridColor;
+        humidityChart.options.scales.y.title.color = textColor;
+        humidityChart.update('none');
     }
     
     // Update radar map tiles
@@ -299,6 +312,64 @@ const themeToggle = document.getElementById('themeToggle');
 if (themeToggle) {
     themeToggle.addEventListener('click', toggleTheme);
     applyTheme(getThemePreference() || 'dark');
+}
+
+// Recenter map button
+const recenterBtn = document.getElementById('recenterBtn');
+if (recenterBtn) {
+    recenterBtn.addEventListener('click', () => {
+        if (radarMap && lastQuery) {
+            radarMap.setView([lastQuery.lat, lastQuery.lon], 7);
+        }
+    });
+}
+
+// Chart tabs
+const tabTemp = document.getElementById('tabTemp');
+const tabWind = document.getElementById('tabWind');
+const tabPrecip = document.getElementById('tabPrecip');
+const tabRainChance = document.getElementById('tabRainChance');
+const tabHumidity = document.getElementById('tabHumidity');
+const tempChartContainer = document.getElementById('tempChartContainer');
+const windChartContainer = document.getElementById('windChartContainer');
+const precipChartContainer = document.getElementById('precipChartContainer');
+const rainChanceChartContainer = document.getElementById('rainChanceChartContainer');
+const humidityChartContainer = document.getElementById('humidityChartContainer');
+
+function setActiveChartTab(tab) {
+    [tabTemp, tabWind, tabPrecip, tabRainChance, tabHumidity].forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+    });
+    [tempChartContainer, windChartContainer, precipChartContainer, rainChanceChartContainer, humidityChartContainer].forEach(c => c.classList.add('hidden'));
+    
+    tab.classList.add('active');
+    tab.setAttribute('aria-selected', 'true');
+    
+    if (tab === tabTemp) {
+        tempChartContainer.classList.remove('hidden');
+        if (tempChart) tempChart.resize();
+    } else if (tab === tabWind) {
+        windChartContainer.classList.remove('hidden');
+        if (windChart) windChart.resize();
+    } else if (tab === tabPrecip) {
+        precipChartContainer.classList.remove('hidden');
+        if (precipHourlyChart) precipHourlyChart.resize();
+    } else if (tab === tabRainChance) {
+        rainChanceChartContainer.classList.remove('hidden');
+        if (rainChanceChart) rainChanceChart.resize();
+    } else if (tab === tabHumidity) {
+        humidityChartContainer.classList.remove('hidden');
+        if (humidityChart) humidityChart.resize();
+    }
+}
+
+if (tabTemp && tabWind && tabPrecip && tabRainChance && tabHumidity) {
+    tabTemp.addEventListener('click', () => setActiveChartTab(tabTemp));
+    tabWind.addEventListener('click', () => setActiveChartTab(tabWind));
+    tabPrecip.addEventListener('click', () => setActiveChartTab(tabPrecip));
+    tabRainChance.addEventListener('click', () => setActiveChartTab(tabRainChance));
+    tabHumidity.addEventListener('click', () => setActiveChartTab(tabHumidity));
 }
 
 function normalizeUnit(unit) {
@@ -497,7 +568,7 @@ async function fetchWeather(lat, lon, locationName = 'Location', options = {}) {
 
     const temperatureUnitParam = unit === 'f' ? 'fahrenheit' : 'celsius';
     const windSpeedUnitParam = unit === 'f' ? 'mph' : 'kmh';
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,surface_pressure,wind_speed_10m&hourly=temperature_2m,precipitation_probability,precipitation,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=${temperatureUnitParam}&wind_speed_unit=${windSpeedUnitParam}&precipitation_unit=mm&timezone=auto&forecast_days=11`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,surface_pressure,wind_speed_10m&hourly=temperature_2m,precipitation_probability,precipitation,wind_speed_10m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=${temperatureUnitParam}&wind_speed_unit=${windSpeedUnitParam}&precipitation_unit=mm&timezone=auto&forecast_days=11`;
 
     try {
         const response = await fetch(url);
@@ -554,6 +625,9 @@ function updateUI(data, locationName) {
     // Update 7-day forecast
     updateForecast(data.daily);
 
+    // Update details table
+    updateDetailsTable(data);
+
     // Update radar map
     updateRadarMap(lastQuery.lat, lastQuery.lon);
 }
@@ -570,6 +644,8 @@ function updateCharts(data) {
     if (tempChart) tempChart.destroy();
     if (precipHourlyChart) precipHourlyChart.destroy();
     if (windChart) windChart.destroy();
+    if (rainChanceChart) rainChanceChart.destroy();
+    if (humidityChart) humidityChart.destroy();
 
     // Temperature Chart (48-hour)
     const tempCtx = document.getElementById('tempChart').getContext('2d');
@@ -769,6 +845,96 @@ function updateCharts(data) {
             }
         }
     });
+
+    // Rain Chance Chart (48-hour)
+    const rainChanceCtx = document.getElementById('rainChanceChart').getContext('2d');
+    const rainChanceData = data.hourly.precipitation_probability.slice(0, 48);
+
+    rainChanceChart = new Chart(rainChanceCtx, {
+        type: 'line',
+        data: {
+            labels: tempTimes,
+            datasets: [{
+                label: 'Shower Chance (%)',
+                data: rainChanceData,
+                borderColor: '#9370DB',
+                backgroundColor: 'rgba(147, 112, 219, 0.2)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                annotation: {
+                    annotations: chartAnnotations
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#a0a0a0' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                },
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: { color: '#a0a0a0' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    title: { display: true, text: '%', color: '#a0a0a0' }
+                }
+            }
+        }
+    });
+
+    // Humidity Chart (48-hour)
+    const humidityCtx = document.getElementById('humidityChart').getContext('2d');
+    const humidityData = data.hourly.relative_humidity_2m.slice(0, 48);
+
+    humidityChart = new Chart(humidityCtx, {
+        type: 'line',
+        data: {
+            labels: tempTimes,
+            datasets: [{
+                label: 'Humidity (%)',
+                data: humidityData,
+                borderColor: '#20B2AA',
+                backgroundColor: 'rgba(32, 178, 170, 0.2)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                annotation: {
+                    annotations: chartAnnotations
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#a0a0a0' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                },
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: { color: '#a0a0a0' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    title: { display: true, text: '%', color: '#a0a0a0' }
+                }
+            }
+        }
+    });
     
     // Start animation for "Now" line
     if (currentHourPos >= 0) {
@@ -778,6 +944,41 @@ function updateCharts(data) {
     // Start minute update interval
     if (positionUpdateInterval) clearInterval(positionUpdateInterval);
     positionUpdateInterval = setInterval(() => minuteUpdate(tempTimes), 60000);
+}
+
+// Update details table
+function updateDetailsTable(data) {
+    const current = data.current;
+    const daily = data.daily;
+    const hourly = data.hourly;
+    const tempUnit = data?.current_units?.temperature_2m || '°C';
+    const windUnit = data?.current_units?.wind_speed_10m || 'km/h';
+    const pressureUnit = data?.current_units?.surface_pressure || 'hPa';
+    const weatherCode = current.weather_code;
+
+    // Find current hour index for hourly data
+    const now = new Date();
+    const currentHourIndex = hourly.time.findIndex(t => {
+        const hourDate = new Date(t);
+        return hourDate.getHours() === now.getHours() && 
+               hourDate.getDate() === now.getDate();
+    });
+
+    document.getElementById('detailTemp').textContent = `${Math.round(current.temperature_2m)}${tempUnit}`;
+    document.getElementById('detailFeelsLike').textContent = `${Math.round(current.apparent_temperature)}${tempUnit}`;
+    document.getElementById('detailHigh').textContent = `${Math.round(daily.temperature_2m_max[0])}${tempUnit}`;
+    document.getElementById('detailLow').textContent = `${Math.round(daily.temperature_2m_min[0])}${tempUnit}`;
+    document.getElementById('detailHumidity').textContent = `${current.relative_humidity_2m}%`;
+    document.getElementById('detailPressure').textContent = `${Math.round(current.surface_pressure)} ${pressureUnit}`;
+    document.getElementById('detailWind').textContent = `${Math.round(current.wind_speed_10m)} ${windUnit}`;
+    document.getElementById('detailConditions').textContent = weatherCodeToDescription[weatherCode] || 'Unknown';
+    
+    // Get current hour precipitation data
+    const currentPrecip = currentHourIndex >= 0 ? hourly.precipitation[currentHourIndex] : 0;
+    const currentRainChance = currentHourIndex >= 0 ? hourly.precipitation_probability[currentHourIndex] : 0;
+    
+    document.getElementById('detailPrecip').textContent = `${currentPrecip.toFixed(1)} mm`;
+    document.getElementById('detailRainChance').textContent = `${currentRainChance}%`;
 }
 
 // Update 7-day forecast cards
