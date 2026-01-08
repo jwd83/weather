@@ -40,9 +40,6 @@ No build step required.
 - **Application code**: Built with GPT 5.2, GLM 4.7, and Claude Opus 4.5
 - **Documentation**: Generated and maintained by Claude Opus
 
-## Status
-
-This project is now in **maintenance mode**.
 
 ## Source
 
