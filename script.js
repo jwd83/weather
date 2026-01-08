@@ -385,7 +385,7 @@ async function fetchWeather(lat, lon, locationName = 'Location', options = {}) {
 
     const temperatureUnitParam = unit === 'f' ? 'fahrenheit' : 'celsius';
     const windSpeedUnitParam = unit === 'f' ? 'mph' : 'kmh';
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,surface_pressure,wind_speed_10m&hourly=temperature_2m,precipitation_probability,precipitation,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=${temperatureUnitParam}&wind_speed_unit=${windSpeedUnitParam}&precipitation_unit=mm&timezone=auto`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,surface_pressure,wind_speed_10m&hourly=temperature_2m,precipitation_probability,precipitation,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=${temperatureUnitParam}&wind_speed_unit=${windSpeedUnitParam}&precipitation_unit=mm&timezone=auto&forecast_days=8`;
 
     try {
         const response = await fetch(url);
@@ -683,6 +683,7 @@ function updateForecast(daily) {
         card.innerHTML = `
             <div class="day">${dayName}</div>
             <div style="font-size: 0.9rem; opacity: 0.9;">${formattedDate}</div>
+            <div style="font-size: 0.85rem; opacity: 0.8; margin-top: 0.5rem;">${weatherCodeToDescription[weatherCode] || 'Unknown'}</div>
             <div class="weather-emoji">${weatherCodeToEmoji[weatherCode] || '🌡️'}</div>
             <div class="temps">
                 <span>${Math.round(daily.temperature_2m_max[index])}°</span> / 
