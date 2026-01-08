@@ -65,12 +65,22 @@ const weatherCodeToDescription = {
 // Chart instances
 let tempChart, precipChart, windChart;
 
+const UNIT_STORAGE_KEY = 'weatherApp.unitPreference';
+const DEFAULT_UNIT = 'c';
+let lastQuery = null;
+
 // Get DOM elements
 const searchBtn = document.getElementById('searchBtn');
 const coordsBtn = document.getElementById('coordsBtn');
 const cityInput = document.getElementById('cityInput');
 const latInput = document.getElementById('latInput');
 const lonInput = document.getElementById('lonInput');
+const unitToggleF = document.getElementById('unitToggleF');
+const unitToggleC = document.getElementById('unitToggleC');
+const tabCity = document.getElementById('tabCity');
+const tabCoords = document.getElementById('tabCoords');
+const panelCity = document.getElementById('panelCity');
+const panelCoords = document.getElementById('panelCoords');
 const loadingEl = document.getElementById('loading');
 const errorEl = document.getElementById('error');
 const weatherContainer = document.getElementById('weatherContainer');
@@ -88,8 +98,105 @@ coordsBtn.addEventListener('click', () => {
         showError('Please enter valid coordinates (Lat: -90 to 90, Lon: -180 to 180)');
         return;
     }
-    fetchWeather(lat, lon);
+    fetchWeather(lat, lon, 'Location', { resolveLocation: true });
 });
+
+function setActiveTab(tab) {
+    if (!tabCity || !tabCoords || !panelCity || !panelCoords) return;
+    const isCity = tab === 'city';
+
+    tabCity.classList.toggle('active', isCity);
+    tabCoords.classList.toggle('active', !isCity);
+    tabCity.setAttribute('aria-selected', String(isCity));
+    tabCoords.setAttribute('aria-selected', String(!isCity));
+    panelCity.hidden = !isCity;
+    panelCoords.hidden = isCity;
+}
+
+if (tabCity && tabCoords && panelCity && panelCoords) {
+    tabCity.addEventListener('click', () => setActiveTab('city'));
+    tabCoords.addEventListener('click', () => setActiveTab('coords'));
+    setActiveTab('city');
+}
+
+if (unitToggleF && unitToggleC) {
+    unitToggleF.addEventListener('click', () => setUserUnitAndRefresh('f'));
+    unitToggleC.addEventListener('click', () => setUserUnitAndRefresh('c'));
+    applyUnitToggleUI(getUserUnitPreference() || DEFAULT_UNIT);
+}
+
+function normalizeUnit(unit) {
+    if (unit === 'f' || unit === 'c') return unit;
+    return null;
+}
+
+function getUserUnitPreference() {
+    try {
+        const unit = localStorage.getItem(UNIT_STORAGE_KEY);
+        return normalizeUnit(unit);
+    } catch {
+        return null;
+    }
+}
+
+function setUserUnitPreference(unit) {
+    try {
+        localStorage.setItem(UNIT_STORAGE_KEY, unit);
+    } catch {
+        // Ignore storage errors
+    }
+}
+
+function getAutoUnitForCountry(countryCode) {
+    if (!countryCode) return null;
+    return countryCode.toLowerCase() === 'us' ? 'f' : 'c';
+}
+
+function getUnitToUse(countryCode, explicitUnit) {
+    const normalizedExplicit = normalizeUnit(explicitUnit);
+    if (normalizedExplicit) return normalizedExplicit;
+
+    const userPreference = getUserUnitPreference();
+    if (userPreference) return userPreference;
+
+    return getAutoUnitForCountry(countryCode) || DEFAULT_UNIT;
+}
+
+function applyUnitToggleUI(unit) {
+    const resolvedUnit = normalizeUnit(unit) || DEFAULT_UNIT;
+    const isF = resolvedUnit === 'f';
+
+    unitToggleF.classList.toggle('active', isF);
+    unitToggleC.classList.toggle('active', !isF);
+    unitToggleF.setAttribute('aria-pressed', String(isF));
+    unitToggleC.setAttribute('aria-pressed', String(!isF));
+}
+
+function setUserUnitAndRefresh(unit) {
+    const resolvedUnit = normalizeUnit(unit);
+    if (!resolvedUnit) return;
+
+    setUserUnitPreference(resolvedUnit);
+    applyUnitToggleUI(resolvedUnit);
+
+    if (!lastQuery) return;
+    fetchWeather(lastQuery.lat, lastQuery.lon, lastQuery.locationName, {
+        countryCode: lastQuery.countryCode,
+        unit: resolvedUnit
+    });
+}
+
+async function reverseGeocode(lat, lon) {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const countryCode = data?.address?.country_code ? String(data.address.country_code).toLowerCase() : null;
+    const displayName = typeof data?.display_name === 'string' ? data.display_name.split(',')[0] : 'Location';
+
+    return { countryCode, displayName };
+}
 
 // Search city using Nominatim API
 async function searchByCity() {
@@ -103,18 +210,20 @@ async function searchByCity() {
     hideError();
 
     try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}&limit=1`);
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encodeURIComponent(city)}&limit=1`);
         const data = await response.json();
 
         if (data && data.length > 0) {
-            const lat = parseFloat(data[0].lat);
-            const lon = parseFloat(data[0].lon);
-            const displayName = data[0].display_name.split(',')[0];
+            const result = data[0];
+            const lat = parseFloat(result.lat);
+            const lon = parseFloat(result.lon);
+            const displayName = result.display_name.split(',')[0];
+            const countryCode = result?.address?.country_code ? String(result.address.country_code).toLowerCase() : null;
 
             latInput.value = lat;
             lonInput.value = lon;
 
-            await fetchWeather(lat, lon, displayName);
+            await fetchWeather(lat, lon, displayName, { countryCode });
         } else {
             showError('City not found. Please try another name or enter coordinates manually.');
             showLoading(false);
@@ -126,11 +235,40 @@ async function searchByCity() {
 }
 
 // Fetch weather data from Open-Meteo API
-async function fetchWeather(lat, lon, locationName = 'Location') {
+async function fetchWeather(lat, lon, locationName = 'Location', options = {}) {
     showLoading(true);
     hideError();
 
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,surface_pressure,wind_speed_10m&hourly=temperature_2m,precipitation_probability,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto`;
+    let resolvedLocationName = locationName;
+    let countryCode = options.countryCode || null;
+
+    if (options.resolveLocation) {
+        try {
+            const resolved = await reverseGeocode(lat, lon);
+            if (resolved) {
+                countryCode = countryCode || resolved.countryCode;
+                if (resolvedLocationName === 'Location') {
+                    resolvedLocationName = resolved.displayName || resolvedLocationName;
+                }
+            }
+        } catch {
+            // Ignore reverse-geocode errors
+        }
+    }
+
+    const unit = getUnitToUse(countryCode, options.unit);
+    if (unitToggleF && unitToggleC) applyUnitToggleUI(unit);
+
+    lastQuery = {
+        lat,
+        lon,
+        locationName: resolvedLocationName,
+        countryCode
+    };
+
+    const temperatureUnitParam = unit === 'f' ? 'fahrenheit' : 'celsius';
+    const windSpeedUnitParam = unit === 'f' ? 'mph' : 'kmh';
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,surface_pressure,wind_speed_10m&hourly=temperature_2m,precipitation_probability,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=${temperatureUnitParam}&wind_speed_unit=${windSpeedUnitParam}&timezone=auto`;
 
     try {
         const response = await fetch(url);
@@ -142,7 +280,7 @@ async function fetchWeather(lat, lon, locationName = 'Location') {
 
         showLoading(false);
         weatherContainer.classList.remove('hidden');
-        updateUI(data, locationName);
+        updateUI(data, resolvedLocationName);
     } catch (error) {
         showError('Failed to fetch weather data. Please try again.');
         showLoading(false);
@@ -162,14 +300,19 @@ function updateUI(data, locationName) {
 
     // Update current weather
     const current = data.current;
+    const tempUnit = data?.current_units?.temperature_2m || '°C';
+    const windUnit = data?.current_units?.wind_speed_10m || 'km/h';
+    const pressureUnit = data?.current_units?.surface_pressure || 'hPa';
     const weatherCode = current.weather_code;
     document.getElementById('currentEmoji').textContent = weatherCodeToEmoji[weatherCode] || '🌡️';
     document.getElementById('currentTemp').textContent = Math.round(current.temperature_2m);
+    document.getElementById('currentTempUnit').textContent = tempUnit;
     document.getElementById('weatherDescription').textContent = weatherCodeToDescription[weatherCode] || 'Unknown';
     document.getElementById('feelsLikeValue').textContent = Math.round(current.apparent_temperature);
+    document.getElementById('feelsLikeUnit').textContent = tempUnit;
     document.getElementById('humidity').textContent = `${current.relative_humidity_2m}%`;
-    document.getElementById('windSpeed').textContent = `${Math.round(current.wind_speed_10m)} km/h`;
-    document.getElementById('pressure').textContent = `${Math.round(current.surface_pressure)} hPa`;
+    document.getElementById('windSpeed').textContent = `${Math.round(current.wind_speed_10m)} ${windUnit}`;
+    document.getElementById('pressure').textContent = `${Math.round(current.surface_pressure)} ${pressureUnit}`;
 
     // Update today's high/low
     document.getElementById('todayHigh').textContent = `${Math.round(data.daily.temperature_2m_max[0])}°`;
@@ -197,12 +340,15 @@ function updateCharts(data) {
         return date.getHours() + ':00';
     });
 
+    const tempUnit = data?.hourly_units?.temperature_2m || '°C';
+    const windUnit = data?.hourly_units?.wind_speed_10m || 'km/h';
+
     tempChart = new Chart(tempCtx, {
         type: 'line',
         data: {
             labels: tempTimes,
             datasets: [{
-                label: 'Temperature (°C)',
+                label: `Temperature (${tempUnit})`,
                 data: temps,
                 borderColor: 'rgba(102, 126, 234, 1)',
                 backgroundColor: 'rgba(102, 126, 234, 0.1)',
@@ -274,7 +420,7 @@ function updateCharts(data) {
         data: {
             labels: tempTimes,
             datasets: [{
-                label: 'Wind Speed (km/h)',
+                label: `Wind Speed (${windUnit})`,
                 data: windData,
                 borderColor: 'rgba(75, 192, 192, 1)',
                 backgroundColor: 'rgba(75, 192, 192, 0.1)',
@@ -357,5 +503,5 @@ function hideError() {
 window.addEventListener('load', () => {
     const defaultLat = 51.5074; // London
     const defaultLon = -0.1278;
-    fetchWeather(defaultLat, defaultLon, 'London, UK');
+    fetchWeather(defaultLat, defaultLon, 'London, UK', { countryCode: 'gb' });
 });
