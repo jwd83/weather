@@ -8,6 +8,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
     <div class="container">
@@ -54,41 +56,46 @@
                     <h2 id="locationName">London, UK</h2>
                     <p id="currentDate"></p>
                 </div>
-                <div class="current-temp">
-                    <span id="currentEmoji" class="weather-emoji">⛅</span>
-                    <div class="temp-display">
-                        <div class="temp-value">
-                            <span id="currentTemp">12</span><span id="currentTempUnit">°C</span>
+                <div class="current-main">
+                    <div class="current-temp">
+                        <span id="currentEmoji" class="weather-emoji">⛅</span>
+                        <div class="temp-display">
+                            <div class="temp-value">
+                                <span id="currentTemp">12</span><span id="currentTempUnit">°C</span>
+                            </div>
+                            <div class="temp-hilo">
+                                <span class="hi">▲ <span id="todayHigh">15°</span></span>
+                                <span class="lo">▼ <span id="todayLow">8°</span></span>
+                            </div>
                         </div>
-                        <div class="temp-hilo">
-                            <span class="hi">▲ <span id="todayHigh">15°</span></span>
-                            <span class="lo">▼ <span id="todayLow">8°</span></span>
+                        <p id="weatherDescription">Partly cloudy</p>
+                        <p id="feelsLike">Feels like <span id="feelsLikeValue">10</span><span id="feelsLikeUnit">°C</span></p>
+                        <div class="weather-details">
+                            <div class="detail-item">
+                                <span class="detail-icon">💧</span>
+                                <div>
+                                    <p class="detail-label">Humidity</p>
+                                    <p id="humidity">65%</p>
+                                </div>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-icon">💨</span>
+                                <div>
+                                    <p class="detail-label">Wind Speed</p>
+                                    <p id="windSpeed">15 km/h</p>
+                                </div>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-icon">🌡️</span>
+                                <div>
+                                    <p class="detail-label">Pressure</p>
+                                    <p id="pressure">1013 hPa</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <p id="weatherDescription">Partly cloudy</p>
-                    <p id="feelsLike">Feels like <span id="feelsLikeValue">10</span><span id="feelsLikeUnit">°C</span></p>
-                </div>
-                <div class="weather-details">
-                    <div class="detail-item">
-                        <span class="detail-icon">💧</span>
-                        <div>
-                            <p class="detail-label">Humidity</p>
-                            <p id="humidity">65%</p>
-                        </div>
-                    </div>
-                    <div class="detail-item">
-                        <span class="detail-icon">💨</span>
-                        <div>
-                            <p class="detail-label">Wind Speed</p>
-                            <p id="windSpeed">15 km/h</p>
-                        </div>
-                    </div>
-                    <div class="detail-item">
-                        <span class="detail-icon">🌡️</span>
-                        <div>
-                            <p class="detail-label">Pressure</p>
-                            <p id="pressure">1013 hPa</p>
-                        </div>
+                    <div class="radar-container">
+                        <div id="radarMap"></div>
                     </div>
                 </div>
             </section>

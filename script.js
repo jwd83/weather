@@ -65,6 +65,10 @@ const weatherCodeToDescription = {
 // Chart instances
 let tempChart, precipHourlyChart, windChart;
 
+// Radar map instance
+let radarMap = null;
+let radarLayer = null;
+
 // Current hour line animation
 let currentHourLineOpacity = 1;
 let opacityDirection = -1;
@@ -441,6 +445,9 @@ function updateUI(data, locationName) {
 
     // Update 7-day forecast
     updateForecast(data.daily);
+
+    // Update radar map
+    updateRadarMap(lastQuery.lat, lastQuery.lon);
 }
 
 // Update all charts
@@ -695,6 +702,46 @@ function updateForecast(daily) {
         `;
         forecastContainer.appendChild(card);
     });
+}
+
+// Initialize or update radar map
+async function updateRadarMap(lat, lon) {
+    const mapContainer = document.getElementById('radarMap');
+    if (!mapContainer) return;
+
+    // Initialize map if not exists
+    if (!radarMap) {
+        radarMap = L.map('radarMap', {
+            zoomControl: false,
+            attributionControl: false
+        }).setView([lat, lon], 7);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19
+        }).addTo(radarMap);
+    } else {
+        radarMap.setView([lat, lon], 7);
+    }
+
+    // Fetch RainViewer radar data
+    try {
+        const response = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+        const data = await response.json();
+        
+        if (data.radar && data.radar.past && data.radar.past.length > 0) {
+            const latestRadar = data.radar.past[data.radar.past.length - 1];
+            
+            if (radarLayer) {
+                radarMap.removeLayer(radarLayer);
+            }
+            
+            radarLayer = L.tileLayer(`https://tilecache.rainviewer.com${latestRadar.path}/256/{z}/{x}/{y}/2/1_1.png`, {
+                opacity: 0.6
+            }).addTo(radarMap);
+        }
+    } catch (error) {
+        console.error('Failed to load radar data:', error);
+    }
 }
 
 // Show/hide loading state
