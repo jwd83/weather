@@ -6,6 +6,8 @@
     <title>Weather App</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
 </head>
 <body>
     <div class="container">
@@ -54,8 +56,14 @@
                 </div>
                 <div class="current-temp">
                     <span id="currentEmoji" class="weather-emoji">⛅</span>
-                    <div class="temp-value">
-                        <span id="currentTemp">12</span><span id="currentTempUnit">°C</span>
+                    <div class="temp-display">
+                        <div class="temp-value">
+                            <span id="currentTemp">12</span><span id="currentTempUnit">°C</span>
+                        </div>
+                        <div class="temp-hilo">
+                            <span class="hi">▲ <span id="todayHigh">15°</span></span>
+                            <span class="lo">▼ <span id="todayLow">8°</span></span>
+                        </div>
                     </div>
                     <p id="weatherDescription">Partly cloudy</p>
                     <p id="feelsLike">Feels like <span id="feelsLikeValue">10</span><span id="feelsLikeUnit">°C</span></p>
@@ -85,28 +93,18 @@
                 </div>
             </section>
 
-            <!-- Today's High/Low -->
-            <section class="today-range">
-                <div class="range-item">
-                    <span class="range-label">High</span>
-                    <span id="todayHigh">15°</span>
-                </div>
-                <div class="range-item">
-                    <span class="range-label">Low</span>
-                    <span id="todayLow">8°</span>
-                </div>
-            </section>
+
 
             <!-- Charts Section -->
             <section class="charts-section">
                 <div class="chart-container">
-                    <h3>24-Hour Temperature</h3>
+                    <h3>48-Hour Temperature</h3>
                     <div class="chart-wrapper">
                         <canvas id="tempChart"></canvas>
                     </div>
                 </div>
                 <div class="chart-container">
-                    <h3>24-Hour Wind Speed</h3>
+                    <h3>48-Hour Wind Speed</h3>
                     <div class="chart-wrapper">
                         <canvas id="windChart"></canvas>
                     </div>
@@ -118,7 +116,7 @@
                 <div id="forecastCards" class="forecast-grid"></div>
             </section>
 
-            <section class="charts-section">
+            <section class="charts-section" style="margin-top: 40px;">
                 <div class="chart-container">
                     <h3>7-Day Precipitation</h3>
                     <div class="chart-wrapper">

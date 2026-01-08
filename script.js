@@ -65,6 +65,69 @@ const weatherCodeToDescription = {
 // Chart instances
 let tempChart, precipChart, windChart;
 
+// Current hour line animation
+let currentHourLineOpacity = 1;
+let opacityDirection = -1;
+let animationFrameId = null;
+
+// Minute update tracking
+let positionUpdateInterval = null;
+let lastWeatherFetch = Date.now();
+const WEATHER_REFRESH_INTERVAL = 15 * 60 * 1000; // 15 minutes
+
+function animateCurrentHourLine() {
+    currentHourLineOpacity += opacityDirection * 0.02;
+    if (currentHourLineOpacity <= 0.3) {
+        currentHourLineOpacity = 0.3;
+        opacityDirection = 1;
+    } else if (currentHourLineOpacity >= 1) {
+        currentHourLineOpacity = 1;
+        opacityDirection = -1;
+    }
+    
+    if (tempChart) tempChart.update('none');
+    if (windChart) windChart.update('none');
+    
+    animationFrameId = requestAnimationFrame(animateCurrentHourLine);
+}
+
+function getCurrentHourPosition(times) {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const minutes = now.getMinutes();
+    const ampm = currentHour >= 12 ? 'PM' : 'AM';
+    const hour12 = currentHour % 12 || 12;
+    const currentLabel = `${hour12}${ampm}`;
+    const hourIndex = times.indexOf(currentLabel);
+    if (hourIndex < 0) return -1;
+    return hourIndex + (minutes / 60);
+}
+
+function minuteUpdate(tempTimes) {
+    // Update "Now" line position
+    const newPos = getCurrentHourPosition(tempTimes);
+    if (newPos >= 0 && tempChart && windChart) {
+        const tempAnnotation = tempChart.options.plugins.annotation.annotations.nowLine;
+        const windAnnotation = windChart.options.plugins.annotation.annotations.nowLine;
+        if (tempAnnotation) {
+            tempAnnotation.xMin = newPos;
+            tempAnnotation.xMax = newPos;
+        }
+        if (windAnnotation) {
+            windAnnotation.xMin = newPos;
+            windAnnotation.xMax = newPos;
+        }
+    }
+    
+    // Refresh weather data if stale
+    if (Date.now() - lastWeatherFetch >= WEATHER_REFRESH_INTERVAL && lastQuery) {
+        lastWeatherFetch = Date.now();
+        fetchWeather(lastQuery.lat, lastQuery.lon, lastQuery.locationName, {
+            countryCode: lastQuery.countryCode
+        });
+    }
+}
+
 const UNIT_STORAGE_KEY = 'weatherApp.unitPreference';
 const LOCATION_STORAGE_KEY = 'weatherApp.lastLocation';
 const DEFAULT_UNIT = 'c';
@@ -323,6 +386,7 @@ async function fetchWeather(lat, lon, locationName = 'Location', options = {}) {
         }
 
         showLoading(false);
+        lastWeatherFetch = Date.now();
         weatherContainer.classList.remove('hidden');
         updateUI(data, resolvedLocationName);
     } catch (error) {
@@ -371,21 +435,87 @@ function updateUI(data, locationName) {
 
 // Update all charts
 function updateCharts(data) {
+    // Stop existing animation
+    if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+    }
+    
     // Destroy existing charts
     if (tempChart) tempChart.destroy();
     if (precipChart) precipChart.destroy();
     if (windChart) windChart.destroy();
 
-    // Temperature Chart (24-hour)
+    // Temperature Chart (48-hour)
     const tempCtx = document.getElementById('tempChart').getContext('2d');
-    const temps = data.hourly.temperature_2m.slice(0, 24);
-    const tempTimes = data.hourly.time.slice(0, 24).map(t => {
+    const temps = data.hourly.temperature_2m.slice(0, 48);
+    const tempTimes = data.hourly.time.slice(0, 48).map(t => {
         const date = new Date(t);
-        return date.getHours() + ':00';
+        const hour = date.getHours();
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const hour12 = hour % 12 || 12;
+        return `${hour12}${ampm}`;
     });
 
     const tempUnit = data?.hourly_units?.temperature_2m || '°C';
     const windUnit = data?.hourly_units?.wind_speed_10m || 'km/h';
+    
+    const currentHourPos = getCurrentHourPosition(tempTimes);
+    
+    // Find where tomorrow starts (first 12AM after index 0)
+    const tomorrowStartIdx = tempTimes.findIndex((t, i) => i > 0 && t === '12AM');
+    
+    const chartAnnotations = {
+        todayBox: {
+            type: 'box',
+            xMin: 0,
+            xMax: tomorrowStartIdx > 0 ? tomorrowStartIdx : 24,
+            backgroundColor: 'rgba(255, 255, 255, 0.03)',
+            borderWidth: 0,
+            label: {
+                display: true,
+                content: 'Today',
+                position: { x: 'start', y: 'start' },
+                color: 'rgba(255, 255, 255, 0.4)',
+                font: { size: 12, weight: 'bold' },
+                padding: 4
+            }
+        },
+        tomorrowBox: {
+            type: 'box',
+            xMin: tomorrowStartIdx > 0 ? tomorrowStartIdx : 24,
+            xMax: 48,
+            backgroundColor: 'rgba(255, 255, 255, 0.06)',
+            borderWidth: 0,
+            label: {
+                display: true,
+                content: 'Tomorrow',
+                position: { x: 'start', y: 'start' },
+                color: 'rgba(255, 255, 255, 0.4)',
+                font: { size: 12, weight: 'bold' },
+                padding: 4
+            }
+        }
+    };
+    
+    if (currentHourPos >= 0) {
+        chartAnnotations.nowLine = {
+            type: 'line',
+            xMin: currentHourPos,
+            xMax: currentHourPos,
+            borderColor: () => `rgba(255, 100, 100, ${currentHourLineOpacity})`,
+            borderWidth: 2,
+            borderDash: [5, 5],
+            label: {
+                display: true,
+                content: 'Now',
+                position: 'start',
+                backgroundColor: () => `rgba(255, 100, 100, ${currentHourLineOpacity})`,
+                color: 'white',
+                font: { size: 10, weight: 'bold' }
+            }
+        };
+    }
 
     tempChart = new Chart(tempCtx, {
         type: 'line',
@@ -394,8 +524,8 @@ function updateCharts(data) {
             datasets: [{
                 label: `Temperature (${tempUnit})`,
                 data: temps,
-                borderColor: 'rgba(102, 126, 234, 1)',
-                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderColor: '#ffffff',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
                 fill: true,
                 tension: 0.4
             }]
@@ -407,11 +537,21 @@ function updateCharts(data) {
             plugins: {
                 legend: {
                     display: false
+                },
+                annotation: {
+                    annotations: chartAnnotations
                 }
             },
             scales: {
+                x: {
+                    ticks: { color: '#a0a0a0' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                },
                 y: {
-                    beginAtZero: false
+                    beginAtZero: false,
+                    ticks: { color: '#a0a0a0' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    title: { display: true, text: tempUnit, color: '#a0a0a0' }
                 }
             }
         }
@@ -432,8 +572,8 @@ function updateCharts(data) {
             datasets: [{
                 label: 'Precipitation Probability (%)',
                 data: precipData,
-                backgroundColor: 'rgba(118, 75, 162, 0.7)',
-                borderColor: 'rgba(118, 75, 162, 1)',
+                backgroundColor: 'rgba(150, 150, 150, 0.7)',
+                borderColor: '#999999',
                 borderWidth: 1
             }]
         },
@@ -444,20 +584,35 @@ function updateCharts(data) {
             plugins: {
                 legend: {
                     display: false
+                },
+                datalabels: {
+                    anchor: 'end',
+                    align: 'end',
+                    color: '#ffffff',
+                    font: { size: 14, weight: 'bold' },
+                    formatter: (value) => value + '%'
                 }
             },
             scales: {
+                x: {
+                    ticks: { color: '#a0a0a0' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                },
                 y: {
                     beginAtZero: true,
-                    max: 100
+                    max: 100,
+                    ticks: { color: '#a0a0a0' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    title: { display: true, text: '%', color: '#a0a0a0' }
                 }
             }
-        }
+        },
+        plugins: [ChartDataLabels]
     });
 
-    // Wind Speed Chart (24-hour)
+    // Wind Speed Chart (48-hour)
     const windCtx = document.getElementById('windChart').getContext('2d');
-    const windData = data.hourly.wind_speed_10m.slice(0, 24);
+    const windData = data.hourly.wind_speed_10m.slice(0, 48);
 
     windChart = new Chart(windCtx, {
         type: 'line',
@@ -466,8 +621,8 @@ function updateCharts(data) {
             datasets: [{
                 label: `Wind Speed (${windUnit})`,
                 data: windData,
-                borderColor: 'rgba(75, 192, 192, 1)',
-                backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                borderColor: '#cccccc',
+                backgroundColor: 'rgba(200, 200, 200, 0.1)',
                 fill: true,
                 tension: 0.4
             }]
@@ -479,15 +634,34 @@ function updateCharts(data) {
             plugins: {
                 legend: {
                     display: false
+                },
+                annotation: {
+                    annotations: chartAnnotations
                 }
             },
             scales: {
+                x: {
+                    ticks: { color: '#a0a0a0' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                },
                 y: {
-                    beginAtZero: true
+                    beginAtZero: true,
+                    ticks: { color: '#a0a0a0' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    title: { display: true, text: windUnit, color: '#a0a0a0' }
                 }
             }
         }
     });
+    
+    // Start animation for "Now" line
+    if (currentHourPos >= 0) {
+        animateCurrentHourLine();
+    }
+    
+    // Start minute update interval
+    if (positionUpdateInterval) clearInterval(positionUpdateInterval);
+    positionUpdateInterval = setInterval(() => minuteUpdate(tempTimes), 60000);
 }
 
 // Update 7-day forecast cards
