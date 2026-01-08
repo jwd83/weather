@@ -455,13 +455,13 @@ header {
 
 .chart-tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 15px;
     padding: 4px;
     background: var(--bg-elevated);
     border-radius: 12px;
     border: 1px solid var(--border-color);
-    width: fit-content;
 }
 
 .chart-tab {
