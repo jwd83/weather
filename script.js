@@ -63,7 +63,7 @@ const weatherCodeToDescription = {
 };
 
 // Chart instances
-let tempChart, precipChart, windChart;
+let tempChart, precipHourlyChart, windChart;
 
 // Current hour line animation
 let currentHourLineOpacity = 1;
@@ -280,7 +280,9 @@ function formatLocationName(address, displayName) {
 
     if (countryCode === 'us') {
         const state = address.state;
-        if (city && state) return `${city}, ${state}`;
+        const locality = city || address.suburb || address.neighbourhood || address.county;
+        if (locality && state) return `${locality}, ${state}`;
+        if (locality) return locality;
         if (state) return state;
     }
 
@@ -315,7 +317,15 @@ async function searchByCity() {
     hideError();
 
     try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encodeURIComponent(city)}&limit=1`);
+        let url;
+        // Check if input is a 5-digit US zip code
+        if (/^\d{5}$/.test(city)) {
+            url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&postalcode=${city}&countrycodes=us&limit=1`;
+        } else {
+            url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encodeURIComponent(city)}&limit=1`;
+        }
+        
+        const response = await fetch(url);
         const data = await response.json();
 
         if (data && data.length > 0) {
@@ -375,7 +385,7 @@ async function fetchWeather(lat, lon, locationName = 'Location', options = {}) {
 
     const temperatureUnitParam = unit === 'f' ? 'fahrenheit' : 'celsius';
     const windSpeedUnitParam = unit === 'f' ? 'mph' : 'kmh';
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,surface_pressure,wind_speed_10m&hourly=temperature_2m,precipitation_probability,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=${temperatureUnitParam}&wind_speed_unit=${windSpeedUnitParam}&timezone=auto`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,surface_pressure,wind_speed_10m&hourly=temperature_2m,precipitation_probability,precipitation,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=${temperatureUnitParam}&wind_speed_unit=${windSpeedUnitParam}&precipitation_unit=mm&timezone=auto`;
 
     try {
         const response = await fetch(url);
@@ -443,7 +453,7 @@ function updateCharts(data) {
     
     // Destroy existing charts
     if (tempChart) tempChart.destroy();
-    if (precipChart) precipChart.destroy();
+    if (precipHourlyChart) precipHourlyChart.destroy();
     if (windChart) windChart.destroy();
 
     // Temperature Chart (48-hour)
@@ -557,59 +567,6 @@ function updateCharts(data) {
         }
     });
 
-    // Precipitation Chart (7-day)
-    const precipCtx = document.getElementById('precipChart').getContext('2d');
-    const precipData = data.daily.precipitation_probability_max;
-    const precipDays = data.daily.time.map(t => {
-        const date = new Date(t);
-        return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    });
-
-    precipChart = new Chart(precipCtx, {
-        type: 'bar',
-        data: {
-            labels: precipDays,
-            datasets: [{
-                label: 'Precipitation Probability (%)',
-                data: precipData,
-                backgroundColor: 'rgba(150, 150, 150, 0.7)',
-                borderColor: '#999999',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                datalabels: {
-                    anchor: 'end',
-                    align: 'end',
-                    color: '#ffffff',
-                    font: { size: 14, weight: 'bold' },
-                    formatter: (value) => value + '%'
-                }
-            },
-            scales: {
-                x: {
-                    ticks: { color: '#a0a0a0' },
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
-                },
-                y: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: { color: '#a0a0a0' },
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                    title: { display: true, text: '%', color: '#a0a0a0' }
-                }
-            }
-        },
-        plugins: [ChartDataLabels]
-    });
-
     // Wind Speed Chart (48-hour)
     const windCtx = document.getElementById('windChart').getContext('2d');
     const windData = data.hourly.wind_speed_10m.slice(0, 48);
@@ -649,6 +606,50 @@ function updateCharts(data) {
                     ticks: { color: '#a0a0a0' },
                     grid: { color: 'rgba(255, 255, 255, 0.05)' },
                     title: { display: true, text: windUnit, color: '#a0a0a0' }
+                }
+            }
+        }
+    });
+
+    // 48-Hour Precipitation Chart
+    const precipHourlyCtx = document.getElementById('precipHourlyChart').getContext('2d');
+    const precipHourlyData = data.hourly.precipitation.slice(0, 48);
+
+    precipHourlyChart = new Chart(precipHourlyCtx, {
+        type: 'line',
+        data: {
+            labels: tempTimes,
+            datasets: [{
+                label: 'Precipitation (mm)',
+                data: precipHourlyData,
+                borderColor: '#6495ED',
+                backgroundColor: 'rgba(100, 149, 237, 0.2)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                annotation: {
+                    annotations: chartAnnotations
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#a0a0a0' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: '#a0a0a0' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    title: { display: true, text: 'mm', color: '#a0a0a0' }
                 }
             }
         }
