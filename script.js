@@ -134,8 +134,109 @@ function minuteUpdate(tempTimes) {
 
 const UNIT_STORAGE_KEY = 'weatherApp.unitPreference';
 const LOCATION_STORAGE_KEY = 'weatherApp.lastLocation';
+const THEME_STORAGE_KEY = 'weatherApp.theme';
 const DEFAULT_UNIT = 'c';
 let lastQuery = null;
+
+// Theme handling
+function getThemePreference() {
+    try {
+        return localStorage.getItem(THEME_STORAGE_KEY);
+    } catch {
+        return null;
+    }
+}
+
+function setThemePreference(theme) {
+    try {
+        localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {}
+}
+
+function applyTheme(theme) {
+    const themeToggle = document.getElementById('themeToggle');
+    if (theme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+        if (themeToggle) themeToggle.textContent = '☀️';
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+        if (themeToggle) themeToggle.textContent = '🌙';
+    }
+    // Update charts if they exist
+    if (lastQuery) updateChartsTheme();
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme');
+    const newTheme = current === 'light' ? 'dark' : 'light';
+    applyTheme(newTheme);
+    setThemePreference(newTheme);
+}
+
+function updateChartsTheme() {
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    const gridColor = isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.05)';
+    const textColor = isLight ? '#555555' : '#a0a0a0';
+    const lineColor = isLight ? '#357abd' : '#ffffff';
+    const windLineColor = isLight ? '#5a9bd4' : '#cccccc';
+    const fillColor = isLight ? 'rgba(53, 122, 189, 0.15)' : 'rgba(255, 255, 255, 0.1)';
+    const windFillColor = isLight ? 'rgba(90, 155, 212, 0.15)' : 'rgba(200, 200, 200, 0.1)';
+    
+    if (tempChart) {
+        tempChart.data.datasets[0].borderColor = lineColor;
+        tempChart.data.datasets[0].backgroundColor = fillColor;
+        tempChart.options.scales.x.ticks.color = textColor;
+        tempChart.options.scales.x.grid.color = gridColor;
+        tempChart.options.scales.y.ticks.color = textColor;
+        tempChart.options.scales.y.grid.color = gridColor;
+        tempChart.options.scales.y.title.color = textColor;
+        tempChart.update('none');
+    }
+    if (windChart) {
+        windChart.data.datasets[0].borderColor = windLineColor;
+        windChart.data.datasets[0].backgroundColor = windFillColor;
+        windChart.options.scales.x.ticks.color = textColor;
+        windChart.options.scales.x.grid.color = gridColor;
+        windChart.options.scales.y.ticks.color = textColor;
+        windChart.options.scales.y.grid.color = gridColor;
+        windChart.options.scales.y.title.color = textColor;
+        windChart.update('none');
+    }
+    if (precipHourlyChart) {
+        precipHourlyChart.options.scales.x.ticks.color = textColor;
+        precipHourlyChart.options.scales.x.grid.color = gridColor;
+        precipHourlyChart.options.scales.y.ticks.color = textColor;
+        precipHourlyChart.options.scales.y.grid.color = gridColor;
+        precipHourlyChart.options.scales.y.title.color = textColor;
+        precipHourlyChart.update('none');
+    }
+    
+    // Update radar map tiles
+    updateRadarMapTheme();
+}
+
+function updateRadarMapTheme() {
+    if (!radarMap) return;
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    
+    // Remove existing base layer and add new one
+    radarMap.eachLayer(layer => {
+        if (layer._url && layer._url.includes('basemaps.cartocdn.com')) {
+            radarMap.removeLayer(layer);
+        }
+    });
+    
+    const tileUrl = isLight 
+        ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+        : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+    
+    L.tileLayer(tileUrl, { maxZoom: 19, zIndex: 1 }).addTo(radarMap);
+    
+    // Bring radar layer back to front
+    if (radarLayer) {
+        radarLayer.bringToFront();
+    }
+}
 
 // Get DOM elements
 const searchBtn = document.getElementById('searchBtn');
@@ -191,6 +292,13 @@ if (unitToggleF && unitToggleC) {
     unitToggleF.addEventListener('click', () => setUserUnitAndRefresh('f'));
     unitToggleC.addEventListener('click', () => setUserUnitAndRefresh('c'));
     applyUnitToggleUI(getUserUnitPreference() || DEFAULT_UNIT);
+}
+
+// Theme toggle
+const themeToggle = document.getElementById('themeToggle');
+if (themeToggle) {
+    themeToggle.addEventListener('click', toggleTheme);
+    applyTheme(getThemePreference() || 'dark');
 }
 
 function normalizeUnit(unit) {
@@ -716,9 +824,11 @@ async function updateRadarMap(lat, lon) {
             attributionControl: false
         }).setView([lat, lon], 7);
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            maxZoom: 19
-        }).addTo(radarMap);
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        const tileUrl = isLight 
+            ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+            : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+        L.tileLayer(tileUrl, { maxZoom: 19, zIndex: 1 }).addTo(radarMap);
     } else {
         radarMap.setView([lat, lon], 7);
     }
